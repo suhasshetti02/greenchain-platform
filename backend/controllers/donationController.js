@@ -76,6 +76,15 @@ function buildPriorityMetadata(donation) {
 
 exports.listDonations = asyncHandler(async (req, res) => {
   const { status, limit = 50, offset = 0 } = req.query;
+  
+  // Mark expired donations before listing
+  const now = new Date().toISOString();
+  await supabase
+    .from("donations")
+    .update({ status: "expired" })
+    .eq("status", "available")
+    .lt("expiry_date", now);
+
   let query = supabase.from("donations").select(DONATION_SELECT);
 
   if (status) {
@@ -108,10 +117,20 @@ exports.listMyDonations = asyncHandler(async (req, res) => {
 exports.listAvailableDonations = asyncHandler(async (req, res) => {
   const { limit = 50 } = req.query;
 
+  // First, mark expired donations as expired
+  const now = new Date().toISOString();
+  await supabase
+    .from("donations")
+    .update({ status: "expired" })
+    .eq("status", "available")
+    .lt("expiry_date", now);
+
+  // Then fetch only available and non-expired donations
   const { data, error } = await supabase
     .from("donations")
     .select(DONATION_SELECT)
     .eq("status", "available")
+    .gt("expiry_date", now)
     .order("expiry_date", { ascending: true })
     .limit(Number(limit));
 
@@ -291,8 +310,20 @@ exports.claimDonation = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // Check if donation is available
   if (donation.status !== "available") {
     const error = new Error("Donation is no longer available");
+    error.status = 400;
+    throw error;
+  }
+
+  // Check if donation has expired
+  const now = new Date();
+  const expiryDate = new Date(donation.expiry_date);
+  if (expiryDate <= now) {
+    // Mark as expired
+    await supabase.from("donations").update({ status: "expired" }).eq("id", id);
+    const error = new Error("This donation has expired and is no longer available");
     error.status = 400;
     throw error;
   }
@@ -322,6 +353,7 @@ exports.claimDonation = asyncHandler(async (req, res) => {
 
   if (claimError) throw claimError;
 
+  // Update donation status to claimed
   await supabase.from("donations").update({ status: "claimed" }).eq("id", id);
 
   res.status(201).json({

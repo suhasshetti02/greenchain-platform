@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 
 import Button from "@/components/Button";
@@ -8,6 +8,7 @@ import StatusBadge from "@/components/StatusBadge";
 import api from "@/lib/api";
 
 export default function VerifyPage({ params }) {
+  const { eventId } = use(params);
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
@@ -19,7 +20,7 @@ export default function VerifyPage({ params }) {
     const fetchEvent = async () => {
       try {
         setLoading(true);
-        const data = await api.verify.get(params.eventId);
+        const data = await api.verify.get(eventId);
         setEvent(data);
         setVerified(data.verified || false);
       } catch (err) {
@@ -30,7 +31,7 @@ export default function VerifyPage({ params }) {
     };
 
     fetchEvent();
-  }, [params.eventId]);
+  }, [eventId]);
 
   const handleVerify = async () => {
     setVerifying(true);
@@ -38,7 +39,7 @@ export default function VerifyPage({ params }) {
     try {
       const dataHash = `0x${Math.random().toString(16).slice(2)}`;
       const response = await api.verify.verify(
-        params.eventId,
+        eventId,
         dataHash,
         "Verified on-site"
       );

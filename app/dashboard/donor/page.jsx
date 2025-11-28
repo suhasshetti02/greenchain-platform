@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import Button from '@/components/Button';
+import ProfileCard from '@/components/ProfileCard';
 import SkeletonList from '@/components/SkeletonList';
 import StatusBadge from '@/components/StatusBadge';
 import { useAuthContext } from '@/contexts/AuthProvider';
@@ -164,6 +165,14 @@ export default function DonorDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Section */}
+      <ProfileCard 
+        stats={{
+          totalDonations: stats?.total ?? donations.length,
+          activeClaims: statusBreakdown.claimed + statusBreakdown.in_transit,
+        }}
+      />
+
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-emerald-500">
@@ -367,9 +376,16 @@ export default function DonorDashboardPage() {
                           ? 'operational'
                           : donation.status === 'claimed'
                             ? 'delayed'
-                            : 'operational'
+                            : donation.status === 'expired'
+                              ? 'delayed'
+                              : 'operational'
                       }
                     />
+                    {donation.status === 'expired' && (
+                      <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                        Expired
+                      </span>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"

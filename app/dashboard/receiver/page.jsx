@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import Button from "@/components/Button";
+import ProfileCard from "@/components/ProfileCard";
 import SkeletonList from "@/components/SkeletonList";
 import StatusBadge from "@/components/StatusBadge";
 import { useAuthContext } from "@/contexts/AuthProvider";
@@ -156,6 +157,14 @@ export default function ReceiverDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Section */}
+      <ProfileCard 
+        stats={{
+          available: stats?.available ?? available.length,
+          activeClaims: activeClaims.length,
+        }}
+      />
+
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-emerald-500">
