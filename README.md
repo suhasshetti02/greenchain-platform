@@ -95,6 +95,7 @@ The project is organized into two main parts:
 *   `./backend`: The Node.js and Express.js API that handles business logic, data storage, and authentication.
 *   `./frontend`: The Next.js client-side application that provides the user interface.
 
+<<<<<<< HEAD
 For a more detailed breakdown of the architecture, please see `frontend/ARCHITECTURE.md`.
 
 ## 🤝 Contributing
@@ -110,5 +111,8 @@ If you have a suggestion that would make this better, please fork the repo and c
 5.  Open a Pull Request
 
 ## 📄 License
+=======
+
+>>>>>>> 67678b3fdeb85d26fd52623202de02e675ac396c
 
 This project is licensed under the MIT License.
