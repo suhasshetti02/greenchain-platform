@@ -1,0 +1,13 @@
+--- LATEST DONATIONS ---
+DONATION: Cooked Rice and Rotis (Donor: 75bb08e4-5210-4fd9-9d10-00361b0bdf9e)
+DONATION: Cooked Rice and Rotis (Donor: 75bb08e4-5210-4fd9-9d10-00361b0bdf9e)
+DONATION: Veg pulav (Donor: 96721ee1-1c37-498a-ad5e-0694dccdf49e)
+DONATION: Egg Rice (Donor: 96721ee1-1c37-498a-ad5e-0694dccdf49e)
+DONATION: Veg Pulao (Donor: e2f0c34b-de3a-4a17-97a0-62417dc71248)
+
+--- LATEST USERS ---
+USER: Sam | samsam@email.com | 8431198795 | ID: 36ba9dbf-9296-4b10-8956-b6be17e14655
+USER: Sam | sam12@email.com | 8431198795 | ID: 112d5d8e-0a02-4124-bd20-279b1fe92afd
+USER: Sam | sam22@email.com | 8431198795 | ID: 75bb08e4-5210-4fd9-9d10-00361b0bdf9e
+USER: Sam | sams@email.com | null | ID: 7166ac34-b66a-4896-ac09-a93ea143c210
+USER: Sam | sam@email.com | null | ID: 0aad4dc5-e99c-4705-87e8-0b75e86219ba

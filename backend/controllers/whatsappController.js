@@ -1,0 +1,246 @@
+const twilio = require("twilio");
+const supabase = require("../utils/supabase");
+const asyncHandler = require("../utils/asyncHandler");
+
+/* ===============================
+   TWILIO CONFIG
+=============================== */
+const client = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+);
+const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER;
+
+/* ===============================
+   SEND WHATSAPP MESSAGE
+=============================== */
+async function sendWhatsAppMessage(to, body) {
+    try {
+        const toNumber = to.startsWith("whatsapp:")
+            ? to
+            : `whatsapp:${to}`;
+
+        const msg = await client.messages.create({
+            from: TWILIO_FROM,
+            to: toNumber,
+            body,
+        });
+
+        console.log(`[WhatsApp] Sent (SID: ${msg.sid}, Status: ${msg.status}) to ${toNumber}`);
+    } catch (err) {
+        console.error("[WhatsApp] Error:", err.message);
+    }
+}
+
+/* ===============================
+   GEMINI FOOD + LOCATION PARSER
+=============================== */
+async function parseFoodReportAI(text) {
+    const prompt = `
+Extract food donation details from this message:
+
+"${text}"
+
+Return ONLY valid JSON:
+{
+  "title": "short food name",
+  "food_type": "cooked | produce | dairy | bakery | other",
+  "quantity_lbs": number,
+  "storage": "room_temp | refrigerated | frozen",
+  "expiry_hours": number,
+  "location": "city/area name if mentioned, else null"
+}
+`;
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                }),
+            }
+        );
+
+        const data = await response.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!raw) return null;
+
+        return JSON.parse(
+            raw.replace(/```json/g, "").replace(/```/g, "").trim()
+        );
+    } catch (err) {
+        console.error("Gemini error:", err);
+        return null;
+    }
+}
+
+/* ===============================
+   WHATSAPP WEBHOOK HANDLER
+=============================== */
+exports.handleIncomingMessage = asyncHandler(async (req, res) => {
+    const { From, Body } = req.body;
+    const message = Body.trim();
+    const cmd = message.toUpperCase();
+
+    const rawPhone = From.replace("whatsapp:", "");
+    // Extract last 10 digits to match database formats typically stored without country code or with inconsistent formats
+    const last10 = rawPhone.replace(/\D/g, "").slice(-10);
+
+    /* ===============================
+       USER LOOKUP
+    =============================== */
+    const { data: users } = await supabase
+        .from("users")
+        .select("id, name, phone, role")
+        .or(`phone.eq.${rawPhone},phone.ilike.%${last10}`)
+        .limit(1);
+
+    const user = users?.[0];
+    if (!user) {
+        await sendWhatsAppMessage(
+            From,
+            "Please register in GreenChain app to use WhatsApp donations."
+        );
+        return res.send("<Response></Response>");
+    }
+
+    /* ===============================
+       DONOR YES / NO HANDLER
+    =============================== */
+    if (["YES", "Y", "NO", "N"].includes(cmd)) {
+        const { data: donations } = await supabase
+            .from("donations")
+            .select("id")
+            .eq("donor_id", user.id);
+
+        const donationIds = donations?.map(d => d.id) || [];
+
+        if (donationIds.length === 0) {
+            await sendWhatsAppMessage(From, "No active donations found to manage.");
+            return res.send("<Response></Response>");
+        }
+
+        const { data: claim } = await supabase
+            .from("claims")
+            .select(`
+        id,
+        donation_id,
+        receiver_id,
+        receiver:receiver_id ( name, phone ),
+        donation:donation_id ( title )
+      `)
+            .in("donation_id", donationIds)
+            .eq("status", "pending")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+        if (!claim) {
+            await sendWhatsAppMessage(From, "No pending pickup requests found.");
+            return res.send("<Response></Response>");
+        }
+
+        if (cmd === "YES" || cmd === "Y") {
+            await supabase.from("claims")
+                .update({ status: "accepted" })
+                .eq("id", claim.id);
+
+            // AUTO-REJECT other claims for this donation
+            await supabase.from("claims")
+                .update({ status: "cancelled" })
+                .eq("donation_id", claim.donation_id)
+                .neq("id", claim.id);
+
+            await supabase.from("donations")
+                .update({ status: "in_transit" })
+                .eq("id", claim.donation_id);
+
+            await sendWhatsAppMessage(
+                From,
+                `✅ Pickup approved for "${claim.donation.title}". Other claims have been cancelled.`
+            );
+
+            if (claim.receiver?.phone) {
+                await sendWhatsAppMessage(
+                    claim.receiver.phone,
+                    `🎉 Donor approved your pickup for "${claim.donation.title}".`
+                );
+            }
+        } else {
+            // REJECT
+            await supabase.from("claims")
+                .update({ status: "cancelled" }) // Changed from rejected to cancelled to match typical enum
+                .eq("id", claim.id);
+
+            await supabase.from("donations")
+                .update({ status: "available" })
+                .eq("id", claim.donation_id);
+
+            await sendWhatsAppMessage(
+                From,
+                `❌ Pickup rejected for "${claim.donation.title}".`
+            );
+
+            if (claim.receiver?.phone) {
+                await sendWhatsAppMessage(
+                    claim.receiver.phone,
+                    `❌ Donor rejected your pickup request for "${claim.donation.title}".`
+                );
+            }
+        }
+
+        return res.send("<Response></Response>");
+    }
+
+    /* ===============================
+       FOOD DONATION MESSAGE
+    =============================== */
+    await sendWhatsAppMessage(From, "🤖 Processing your donation...");
+
+    const extracted = await parseFoodReportAI(message);
+    if (!extracted || !extracted.title) {
+        await sendWhatsAppMessage(
+            From,
+            "Couldn't understand.\nExample: '5kg cooked rice at Bengaluru'"
+        );
+        return res.send("<Response></Response>");
+    }
+
+    const { error } = await supabase.from("donations").insert({
+        donor_id: user.id,
+        title: extracted.title,
+        food_type: extracted.food_type,
+        category: extracted.food_type,
+        quantity_lbs: extracted.quantity_lbs || 5,
+        unit: "lbs",
+        storage: extracted.storage || "room_temp",
+        expiry_date: new Date(
+            Date.now() + (extracted.expiry_hours || 24) * 3600000
+        ).toISOString(),
+        status: "available",
+        location: extracted.location || "Not provided",
+        priority_score: 50,
+        risk_score: 0.1,
+        notes: `Reported via WhatsApp: "${message}"`,
+    });
+
+    if (error) {
+        console.error(error);
+        await sendWhatsAppMessage(From, "❌ Failed to save donation.");
+    } else {
+        await sendWhatsAppMessage(
+            From,
+            `✅ Donation listed successfully!`
+        );
+    }
+
+    res.send("<Response></Response>");
+});
+
+/* ===============================
+   EXPORT
+=============================== */
+exports.sendWhatsAppMessage = sendWhatsAppMessage;
