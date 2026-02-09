@@ -56,44 +56,67 @@ async function sendWhatsAppMessage(to, body) {
 /* ===============================
    GEMINI FOOD + LOCATION PARSER
 =============================== */
+/* ===============================
+   GEMINI FOOD + LOCATION PARSER
+=============================== */
 async function parseFoodReportAI(text) {
+    console.log("[Gemini] Preparing request for:", text);
+
     const prompt = `
-Extract food donation details from this message:
+You are an AI assistant for a food donation platform. Analyze the following message and extract the details.
 
-"${text}"
+User Message: "${text}"
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with this structure:
 {
-  "title": "short food name",
-  "food_type": "cooked | produce | dairy | bakery | other",
-  "quantity_lbs": number,
-  "storage": "room_temp | refrigerated | frozen",
-  "expiry_hours": number,
-  "location": "city/area name if mentioned, else null"
+  "title": "Short descriptive title of the food (e.g., '5kg Rice')",
+  "food_type": "One of: cooked, produce, dairy, bakery, other",
+  "quantity_lbs": "Estimated weight in lbs (number only, default 5 if unknown)",
+  "storage": "One of: room_temp, refrigerated, frozen (default room_temp)",
+  "expiry_hours": "Estimated hours until expiry (number only, default 24)",
+  "location": "City or area name if mentioned (e.g., 'Whitefield, Bangalore'). If not found, return 'Not provided'"
 }
 `;
 
+    const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+    };
+
     try {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
+
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                }),
+                body: JSON.stringify(payload),
             }
         );
 
         if (!response.ok) {
-            console.error("Gemini API Error:", response.status, response.statusText);
-            return { title: text, food_type: "other", quantity_lbs: 5, storage: "room_temp" }; // Fallback
+            const errText = await response.text();
+            console.error(`[Gemini] API Error ${response.status}: ${errText}`);
+            // Fallback: Create a basic entry
+            return { 
+                title: text.substring(0, 50), 
+                food_type: "other", 
+                quantity_lbs: 5, 
+                storage: "room_temp",
+                location: "Not provided" 
+            };
         }
 
         const data = await response.json();
         const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         
-        if (!raw) return { title: text, food_type: "other", quantity_lbs: 5, storage: "room_temp" }; // Fallback
+        console.log("[Gemini] Response:", raw);
+
+        if (!raw) {
+             console.warn("[Gemini] Empty response from AI");
+             return { title: text.substring(0, 50), food_type: "other", quantity_lbs: 5, storage: "room_temp", location: "Not provided" };
+        }
 
         // Robust JSON extraction
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -101,10 +124,9 @@ Return ONLY valid JSON:
 
         return JSON.parse(jsonString);
     } catch (err) {
-        console.error("Gemini parsing error:", err);
-        // Fallback: Create a basic entry using the message as the title
+        console.error("[Gemini] Parsing error:", err.message);
         return {
-            title: text.substring(0, 100), // Truncate if too long
+            title: text.substring(0, 50),
             food_type: "other",
             quantity_lbs: 5,
             storage: "room_temp",
