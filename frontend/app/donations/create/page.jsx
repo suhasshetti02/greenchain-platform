@@ -88,6 +88,7 @@ export default function CreateDonationPage() {
   const router = useRouter();
   const { user, token } = useAuthContext();
   
+  const [file, setFile] = useState(null); // Capture file for manual append
   const [preview, setPreview] = useState("");
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
@@ -188,9 +189,10 @@ export default function CreateDonationPage() {
   };
 
   const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setPreview(URL.createObjectURL(file));
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+    setFile(selectedFile);
+    setPreview(URL.createObjectURL(selectedFile));
   };
 
   const handleSubmit = async (event) => {
@@ -199,6 +201,11 @@ export default function CreateDonationPage() {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
+
+    // Manually append the file because the input is outside the <form>
+    if (file) {
+      formData.append("image", file);
+    }
 
     // Validate expiry using state variable
     if (!expiryDate) {

@@ -17,7 +17,15 @@ const statusMap = {
   expired: "expired",
 };
 
-const DonationCard = forwardRef(function DonationCard({ donation, userLocation, onManualLocate, index = 0 }, ref) {
+const DonationCard = forwardRef(function DonationCard({ 
+  donation, 
+  userLocation, 
+  onManualLocate, 
+  onClaim, 
+  claiming = false,
+  isClaimed = false,
+  index = 0 
+}, ref) {
   const isAvailable = donation.status === "available";
   const [distance, setDistance] = useState(null);
 
@@ -34,7 +42,6 @@ const DonationCard = forwardRef(function DonationCard({ donation, userLocation, 
     }
   }, [userLocation, donation]);
 
-  // AI Risk Logic
   // AI Risk Logic
   const riskScore = (donation.risk_score !== null && donation.risk_score !== undefined) ? Math.round(donation.risk_score * 100) : null;
   let riskColor = "bg-slate-100 text-slate-700";
@@ -88,12 +95,12 @@ const DonationCard = forwardRef(function DonationCard({ donation, userLocation, 
         )}
         
         {/* Status Badge Overlay */}
-        <div className="absolute top-4 right-4 shadow-sm">
-          <StatusBadge status={statusMap[donation.status] || "operational"} />
+        <div className="absolute top-4 right-4 shadow-sm z-10">
+          <StatusBadge status={isClaimed ? "claimed" : (statusMap[donation.status] || "operational")} />
         </div>
         
         {/* Category Pill Overlay */}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 z-10">
           <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-700 backdrop-blur-md">
             {donation.category}
           </span>
@@ -162,24 +169,39 @@ const DonationCard = forwardRef(function DonationCard({ donation, userLocation, 
           )}
         </div>
 
-        <div className="mt-auto flex items-center gap-3">
-          <Button 
-            as={Link} 
-            href={`/donations/${donation.id}`} 
-            className="flex-1 bg-slate-900 hover:bg-slate-800"
-          >
-            Details
-          </Button>
-          
-          {isAvailable && (
-            <Link
-              href={`/donations/${donation.id}`}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-slate-400 transition-colors hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
-              title="Quick Claim"
+        <div className="mt-auto flex flex-col gap-3">
+          {onClaim && (
+            <Button 
+                onClick={() => onClaim(donation.id)}
+                disabled={isClaimed || claiming}
+                variant={isClaimed ? "secondary" : "default"}
+                className="w-full justify-center"
             >
-              <ArrowRight className="h-5 w-5" />
-            </Link>
+                {claiming ? "Processing..." : isClaimed ? "Waiting for Confirmation" : "Claim Donation"}
+            </Button>
           )}
+
+          <div className="flex gap-3">
+            <Button 
+                as={Link} 
+                href={`/donations/${donation.id}`} 
+                variant="outline"
+                className="flex-1 justify-center"
+            >
+                View Details
+            </Button>
+            
+            {/* Show quick arrow only if not using onClaim or if available */}
+            {!onClaim && isAvailable && (
+                <Link
+                href={`/donations/${donation.id}`}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-slate-400 transition-colors hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600"
+                title="Quick Claim"
+                >
+                <ArrowRight className="h-5 w-5" />
+                </Link>
+            )}
+          </div>
         </div>
       </div>
     </motion.article>

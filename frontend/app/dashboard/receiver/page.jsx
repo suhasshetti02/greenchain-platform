@@ -17,6 +17,7 @@ import {
 import LocationPermissionModal from "@/components/LocationPermissionModal";
 import Button from "@/components/Button";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import DonationCard from "@/components/DonationCard";
 import ProfileCard from "@/components/ProfileCard";
 import SkeletonList from "@/components/SkeletonList";
 import StatusBadge from "@/components/StatusBadge";
@@ -421,6 +422,7 @@ export default function ReceiverDashboardPage() {
             onClaim={handleClaim}
             claimingId={claimingId}
             userLocation={location}
+            activeClaims={activeClaims}
             emptyLabel={
               isFiltered
                 ? "No donations match your current filters."
@@ -459,146 +461,10 @@ function MiniStat({ label, value, helper }) {
   );
 }
 
-// ... inside AvailableList component ...
 
-// Extracted component to handle distance state individually
-function DashboardDonationItem({ donation, onClaim, claimingId, userLocation, router }) {
-  const [distance, setDistance] = useState(null);
 
-  useEffect(() => {
-    if (userLocation && donation.latitude && donation.longitude) {
-       // Debug logs
-       console.log(`[Distance Debug] "${donation.title}":`, { 
-          userLat: userLocation.latitude, 
-          userLng: userLocation.longitude, 
-          donLat: donation.latitude, 
-          donLng: donation.longitude
-       });
-       
-       const dist = calculateDistance(
-         userLocation.latitude, 
-         userLocation.longitude, 
-         donation.latitude, 
-         donation.longitude
-       );
-       setDistance(dist);
-    }
-  }, [userLocation, donation]);
-
-  // AI Risk Logic (Copied from DonationCard for consistency)
-  const riskScore = (donation.risk_score !== null && donation.risk_score !== undefined) ? Math.round(donation.risk_score * 100) : null;
-  let riskColor = "bg-slate-100 text-slate-700";
-  let riskLabel = "Unknown";
-  let riskBorder = "border-slate-200";
-
-  if (riskScore !== null) {
-      if (riskScore > 80) {
-          riskColor = "bg-rose-50 text-rose-700";
-          riskBorder = "border-rose-200";
-          riskLabel = "Critical Risk";
-      } else if (riskScore > 50) {
-          riskColor = "bg-amber-50 text-amber-700";
-          riskBorder = "border-amber-200";
-          riskLabel = "High Risk";
-      } else if (riskScore > 20) {
-          riskColor = "bg-yellow-50 text-yellow-700";
-          riskBorder = "border-yellow-200";
-          riskLabel = "Medium Risk";
-      } else {
-          riskColor = "bg-emerald-50 text-emerald-700";
-          riskBorder = "border-emerald-200";
-          riskLabel = "Low Risk";
-      }
-  }
-
-  return (
-        <article
-          className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                {donation.category}
-              </p>
-              <h3 className="text-xl font-semibold text-slate-900">
-                {donation.title}
-              </h3>
-              <p className="text-sm text-slate-500">{donation.donor?.name}</p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-                <StatusBadge
-                  status={
-                    donation.priority === "critical" ? "critical" : "available"
-                  }
-                />
-                
-                {/* AI Badge */}
-                {riskScore !== null && (
-                     <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${riskColor} ${riskBorder}`}>
-                         AI: {riskLabel} ({riskScore}%)
-                     </span>
-                )}
-
-                {/* Distance Badge */}
-                {distance && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
-                      <MapPin size={10} /> {distance} km
-                    </span>
-                )}
-            </div>
-          </div>
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-slate-500">Quantity</dt>
-              <dd className="font-semibold text-slate-900">
-                {donation.quantity_lbs} {donation.unit}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Location</dt>
-              <dd className="font-semibold text-slate-900 truncate">
-                {donation.location}
-              </dd>
-            </div>
-            {donation.pickup_window_start && (
-                <div className="col-span-2">
-                  <dt className="text-slate-500">Pickup Window</dt>
-                  <dd className="font-semibold text-slate-900">
-                    {new Date(donation.pickup_window_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(donation.pickup_window_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                  </dd>
-                </div>
-            )}
-          </dl>
-          <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-            {donation.priorityHint}
-          </p>
-          <Button
-            className="mt-4 w-full"
-            disabled={claimingId === donation.id}
-            onClick={() => onClaim(donation.id)}
-          >
-            {claimingId === donation.id ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Claiming...
-              </>
-            ) : (
-              "Claim Donation"
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            className="mt-2 w-full"
-            onClick={() => router.push(`/donations/${donation.id}`)}
-          >
-            View Details
-          </Button>
-        </article>
-  );
-}
-
-function AvailableList({ donations, loading, onClaim, claimingId, emptyLabel, userLocation }) {
-  const router = useRouter(); // <--- Hook called here, in a safely exported component or main component context
+function AvailableList({ donations, loading, onClaim, claimingId, emptyLabel, userLocation, activeClaims = [] }) {
+  const router = useRouter(); 
   const { getCurrentLocation } = useLocation(); 
 
   if (loading) {
@@ -614,24 +480,31 @@ function AvailableList({ donations, loading, onClaim, claimingId, emptyLabel, us
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {!userLocation && (
-          <div className="md:col-span-2 flex justify-end">
+          <div className="col-span-full flex justify-end">
              <button onClick={getCurrentLocation} className="text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline">
                 <MapPin size={12} /> Enable Location for Distances
              </button>
           </div>
       )}
-      {donations.map((donation) => (
-        <DashboardDonationItem 
-            key={donation.id} 
-            donation={donation} 
-            onClaim={onClaim} 
-            claimingId={claimingId} 
-            userLocation={userLocation} 
-            router={router}
-        />
-      ))}
+      {donations.map((donation) => {
+        // Check if this donation is already claimed by the current user
+        // We check against active claims (pending or accepted)
+        const isClaimed = activeClaims.some(c => c.donation_id === donation.id);
+        
+        return (
+          <DonationCard 
+              key={donation.id} 
+              donation={donation}
+              userLocation={userLocation}
+              onClaim={onClaim}
+              claiming={claimingId === donation.id}
+              isClaimed={isClaimed}
+              onManualLocate={getCurrentLocation}
+          />
+        );
+      })}
     </div>
   );
 }
