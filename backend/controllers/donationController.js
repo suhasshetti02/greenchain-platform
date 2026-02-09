@@ -538,6 +538,11 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
   if (userLat && userLng) {
 
     results = data.map(d => {
+      // If donation has no coords, distance is Infinity (push to bottom)
+      if (!d.latitude || !d.longitude) {
+         return { ...d, distance_km: 9999 };
+      }
+      
       const dist = haversineDistance(userLat, userLng, d.latitude, d.longitude);
       return {
         ...d,
@@ -545,15 +550,13 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
       };
     });
 
-    // FILTER: Only show donations within 50km (approx city limit)
-    results = results.filter(d => d.distance_km <= 50);
+    // FILTER: Only show donations within 30km (City Level)
+    // If distance is massive (e.g. Hyderabad -> Bangalore ~500km), it will be filtered out.
+    results = results.filter(d => d.distance_km <= 30);
 
     results.sort((a, b) => {
       // Primary sort: Distance (Ascending)
-      if (a.distance_km !== null && b.distance_km !== null) {
-        return a.distance_km - b.distance_km;
-      }
-      return 0;
+      return a.distance_km - b.distance_km;
     });
   } else if (req.user && req.user.role === 'receiver') {
     // Fallback: simple text match if user has address but no coords
@@ -571,7 +574,7 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
 
       if (userCity.length > 2) { // Only filter if we have a reasonable city name
         results = results.filter(d => {
-          if (!d.location) return true;
+          if (!d.location) return true; // Keep if unknown, to be safe
           // Check if donation location strictly contains the user's city
           return d.location.toLowerCase().includes(userCity.toLowerCase());
         });
