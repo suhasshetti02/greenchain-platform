@@ -16,9 +16,19 @@ const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER;
 =============================== */
 async function sendWhatsAppMessage(to, body) {
     try {
-        const toNumber = to.startsWith("whatsapp:")
-            ? to
-            : `whatsapp:${to}`;
+        // 1. Normalize Phone Number
+        // Remove "whatsapp:" prefix if present
+        let raw = to.replace("whatsapp:", "").trim();
+        
+        // Remove all non-numeric characters (keep digits only)
+        let cleanPhone = raw.replace(/\D/g, "");
+
+        // Default to India (+91) if only 10 digits provided
+        if (cleanPhone.length === 10) {
+            cleanPhone = "91" + cleanPhone;
+        }
+
+        const toNumber = `whatsapp:+${cleanPhone}`;
 
         const msg = await client.messages.create({
             from: TWILIO_FROM,
