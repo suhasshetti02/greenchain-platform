@@ -11,41 +11,20 @@ const client = twilio(
 );
 const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER;
 
-/* ===============================
-   GEOCODING HELPER (Direct HTTPS)
-=============================== */
-async function geocodeLocation(address) {
-    try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-        
-        // Nominatim requires a User-Agent
-        const response = await fetch(url, {
-            headers: {
-                "User-Agent": "GreenChainPlatform/1.0 (greenchain.platform@gmail.com)"
-            }
-        });
+        // 2. Geocode Location - DISABLED AS PER USER REQUEST
+        // User explicitly requested to stop using geocoding due to network errors.
+        // We will only store the text location.
+        let latitude = null;
+        let longitude = null;
 
-        if (!response.ok) {
-            console.error(`[Geocoder] HTTP Error: ${response.status}`);
-            return null;
+        /* 
+        // LEGACY GEOCODING LOGIC (Removed)
+        if (extracted.location && extracted.location !== "Not provided") {
+            try {
+                // ... fetch logic ...
+            } catch (geoErr) { ... }
         }
-
-        const data = await response.json();
-        if (data && data.length > 0) {
-            return {
-                latitude: parseFloat(data[0].lat),
-                longitude: parseFloat(data[0].lon)
-            };
-        }
-    } catch (err) {
-        console.error("[Geocoder] Error:", err.message);
-    }
-    return null;
-}
-
-/* ===============================
-   SEND WHATSAPP MESSAGE
-=============================== */
+        */
 async function sendWhatsAppMessage(to, body) {
     try {
         // 1. Normalize Phone Number
@@ -295,22 +274,12 @@ exports.handleIncomingMessage = async (req, res) => {
             return;
         }
 
-        // 2. Geocode Location (using Direct HTTPS Fetch)
+        // 2. Geocode Location - DISABLED
         let latitude = null;
         let longitude = null;
 
-        if (extracted.location && extracted.location !== "Not provided") {
-            try {
-                const geoRes = await geocodeLocation(extracted.location);
-                if (geoRes) {
-                    latitude = geoRes.latitude;
-                    longitude = geoRes.longitude;
-                    console.log(`[WhatsApp] Geocoded '${extracted.location}' -> ${latitude}, ${longitude}`);
-                }
-            } catch (geoErr) {
-                console.error("[WhatsApp] Geocoding error:", geoErr);
-            }
-        }
+        // Geocoding block removed as per user request to avoid fetch errors.
+        // if (extracted.location && extracted.location !== "Not provided") { ... }
 
         const { error } = await supabase.from("donations").insert({
             donor_id: user.id,
