@@ -551,8 +551,8 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
     });
 
     // FILTER: Only show donations within 30km (City Level)
-    // If distance is massive (e.g. Hyderabad -> Bangalore ~500km), it will be filtered out.
-    results = results.filter(d => d.distance_km <= 30);
+    // EXCEPTION: Keep donations with unknown location (distance_km === 9999) so they remain visible.
+    results = results.filter(d => d.distance_km <= 30 || d.distance_km === 9999);
 
     results.sort((a, b) => {
       // Primary sort: Distance (Ascending)
