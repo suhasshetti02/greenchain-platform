@@ -1,15 +1,6 @@
 const twilio = require("twilio");
 const supabase = require("../utils/supabase");
 const asyncHandler = require("../utils/asyncHandler");
-const NodeGeocoder = require('node-geocoder');
-
-const geocoder = NodeGeocoder({
-  provider: 'openstreetmap',
-  httpAdapter: 'https', // Force HTTPS
-  headers: {
-      'User-Agent': 'GreenChainPlatform/1.0 (greenchain.platform@gmail.com)' // Required by Nominatim
-  }
-});
 
 /* ===============================
    TWILIO CONFIG
@@ -19,6 +10,38 @@ const client = twilio(
     process.env.TWILIO_AUTH_TOKEN
 );
 const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER;
+
+/* ===============================
+   GEOCODING HELPER (Direct HTTPS)
+=============================== */
+async function geocodeLocation(address) {
+    try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+        
+        // Nominatim requires a User-Agent
+        const response = await fetch(url, {
+            headers: {
+                "User-Agent": "GreenChainPlatform/1.0 (greenchain.platform@gmail.com)"
+            }
+        });
+
+        if (!response.ok) {
+            console.error(`[Geocoder] HTTP Error: ${response.status}`);
+            return null;
+        }
+
+        const data = await response.json();
+        if (data && data.length > 0) {
+            return {
+                latitude: parseFloat(data[0].lat),
+                longitude: parseFloat(data[0].lon)
+            };
+        }
+    } catch (err) {
+        console.error("[Geocoder] Error:", err.message);
+    }
+    return null;
+}
 
 /* ===============================
    SEND WHATSAPP MESSAGE
@@ -73,7 +96,7 @@ Return ONLY valid JSON:
 
     try {
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -272,16 +295,16 @@ exports.handleIncomingMessage = async (req, res) => {
             return;
         }
 
-        // 2. Geocode Location
+        // 2. Geocode Location (using Direct HTTPS Fetch)
         let latitude = null;
         let longitude = null;
 
         if (extracted.location && extracted.location !== "Not provided") {
             try {
-                const geoRes = await geocoder.geocode(extracted.location);
-                if (geoRes && geoRes.length > 0) {
-                    latitude = geoRes[0].latitude;
-                    longitude = geoRes[0].longitude;
+                const geoRes = await geocodeLocation(extracted.location);
+                if (geoRes) {
+                    latitude = geoRes.latitude;
+                    longitude = geoRes.longitude;
                     console.log(`[WhatsApp] Geocoded '${extracted.location}' -> ${latitude}, ${longitude}`);
                 }
             } catch (geoErr) {
