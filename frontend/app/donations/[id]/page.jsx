@@ -13,10 +13,13 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle,
-  Trash2,
   Edit,
-  Info
+  Trash2,
+  Info,
+  X,
+  ZoomIn
 } from "lucide-react";
+import { createPortal } from "react-dom";
 
 import Button from "@/components/Button";
 import StatusBadge from "@/components/StatusBadge";
@@ -41,6 +44,12 @@ export default function DonationDetailPage({ params }) {
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const fetchDonation = async () => {
@@ -116,6 +125,33 @@ export default function DonationDetailPage({ params }) {
   const canManage = user && user.role === "donor" && donation.donor?.id === user.id && donation.status === "available";
 
   return (
+    <>
+      {isImageExpanded && mounted && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsImageExpanded(false)}
+        >
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsImageExpanded(false); }}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors bg-white/10 rounded-full p-2 z-[10000]"
+          >
+            <X className="h-8 w-8" />
+          </button>
+          <div className="relative h-full w-full max-w-5xl max-h-[90vh] flex items-center justify-center p-4">
+            <Image
+              src={donation.image_url}
+              alt={donation.title}
+              fill
+              className="object-contain rounded-lg"
+              sizes="100vw"
+              priority
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
     <main className="min-h-screen bg-gray-50/50 py-10 px-4 sm:px-6">
       <article className="mx-auto max-w-5xl space-y-8">
 
@@ -151,15 +187,28 @@ export default function DonationDetailPage({ params }) {
         </div>
 
         {/* Hero Image */}
-        <div className="relative overflow-hidden rounded-3xl bg-gray-100 shadow-sm ring-1 ring-gray-900/5 aspect-[21/9]">
+        <div 
+          className={`relative overflow-hidden rounded-3xl bg-gray-100 shadow-sm ring-1 ring-gray-900/5 aspect-[21/9] ${donation.image_url ? 'cursor-zoom-in group/image' : ''}`}
+          onClick={() => {
+            if (donation.image_url) setIsImageExpanded(true);
+          }}
+        >
           {donation.image_url ? (
-            <Image
-              src={donation.image_url}
-              alt={donation.title}
-              fill
-              className="object-cover"
-              priority
-            />
+            <>
+              <Image
+                src={donation.image_url}
+                alt={donation.title}
+                fill
+                className="object-cover transition-transform duration-700 hover:scale-105"
+                priority
+              />
+               {/* Zoom Hint Overlay */}
+               <div className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/10 transition-colors duration-300">
+                  <div className="opacity-0 hover:opacity-100 bg-black/50 text-white rounded-full p-3 transition-opacity duration-300 transform scale-75 hover:scale-100 backdrop-blur-sm">
+                      <ZoomIn className="h-6 w-6" />
+                  </div>
+              </div>
+            </>
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center text-slate-400 bg-slate-50">
               <Package className="h-16 w-16 opacity-20" />
@@ -291,6 +340,7 @@ export default function DonationDetailPage({ params }) {
 
       </article>
     </main>
+    </>
   );
 }
 

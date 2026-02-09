@@ -409,10 +409,18 @@ exports.claimDonation = asyncHandler(async (req, res) => {
     .single();
 
   if (donor && donor.phone) {
-    await sendWhatsAppMessage(
-      donor.phone,
-      `Hello ${donor.name}, ${receiverName} wants to claim your donation "${donation.title}".\nReply "YES" to approve or "NO" to decline.`
-    );
+    console.log(`[Claim] Notifying donor ${donor.name} (${donor.phone}) about claim by ${receiverName}`);
+    try {
+      await sendWhatsAppMessage(
+        donor.phone,
+        `Hello ${donor.name}, ${receiverName} has requested to claim your donation "${donation.title}".\n\nReply "YES" to approve or "NO" to decline.`
+      );
+      console.log(`[Claim] Notification sent to donor.`);
+    } catch (err) {
+      console.error(`[Claim] Failed to notify donor:`, err);
+    }
+  } else {
+    console.warn(`[Claim] Donor for donation ${id} has no phone number. Cannot notify.`);
   }
 
   await supabase.from("alerts").insert({

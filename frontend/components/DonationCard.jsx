@@ -5,7 +5,8 @@ import Image from "next/image";
 import { useLocation, calculateDistance } from "@/hooks/useLocation";
 import { useEffect, useState, forwardRef } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Package, Clock, ArrowRight } from "lucide-react";
+import { MapPin, Package, Clock, ArrowRight, X, ZoomIn } from "lucide-react";
+import { createPortal } from "react-dom";
 import Button from "@/components/Button";
 import StatusBadge from "@/components/StatusBadge";
 
@@ -28,6 +29,12 @@ const DonationCard = forwardRef(function DonationCard({
 }, ref) {
   const isAvailable = donation.status === "available";
   const [distance, setDistance] = useState(null);
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Auto-calculate distance if user location is available
   useEffect(() => {
@@ -69,6 +76,33 @@ const DonationCard = forwardRef(function DonationCard({
   }
 
   return (
+    <>
+      {isImageExpanded && mounted && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsImageExpanded(false)}
+        >
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsImageExpanded(false); }}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors bg-white/10 rounded-full p-2 z-[10000]"
+          >
+            <X className="h-8 w-8" />
+          </button>
+          <div className="relative h-full w-full max-w-5xl max-h-[90vh] flex items-center justify-center p-4">
+            <Image
+              src={donation.image_url}
+              alt={donation.title}
+              fill
+              className="object-contain rounded-lg"
+              sizes="100vw"
+              priority
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
     <motion.article
       ref={ref}
       initial={{ opacity: 0, y: 20 }}
@@ -79,15 +113,28 @@ const DonationCard = forwardRef(function DonationCard({
     >
       
       {/* Image Section */}
-      <div className="relative h-48 w-full overflow-hidden bg-gray-100">
+      <div 
+        className={`relative h-48 w-full overflow-hidden bg-gray-100 ${donation.image_url ? 'cursor-zoom-in group/image' : ''}`}
+        onClick={() => {
+            if (donation.image_url) setIsImageExpanded(true);
+        }}
+      >
         {donation.image_url ? (
-          <Image
-            src={donation.image_url}
-            alt={donation.title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-          />
+          <>
+            <Image
+              src={donation.image_url}
+              alt={donation.title}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            />
+             {/* Zoom Hint Overlay */}
+             <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/image:bg-black/10 transition-colors duration-300">
+                <div className="opacity-0 group-hover/image:opacity-100 bg-black/50 text-white rounded-full p-2 transition-opacity duration-300 transform scale-75 group-hover/image:scale-100">
+                    <ZoomIn className="h-5 w-5" />
+                </div>
+            </div>
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-slate-300">
             <Package className="h-10 w-10" />
@@ -95,12 +142,12 @@ const DonationCard = forwardRef(function DonationCard({
         )}
         
         {/* Status Badge Overlay */}
-        <div className="absolute top-4 right-4 shadow-sm z-10">
+        <div className="absolute top-4 right-4 shadow-sm z-10 pointer-events-none">
           <StatusBadge status={isClaimed ? "claimed" : (statusMap[donation.status] || "operational")} />
         </div>
         
         {/* Category Pill Overlay */}
-        <div className="absolute top-4 left-4 z-10">
+        <div className="absolute top-4 left-4 z-10 pointer-events-none">
           <span className="inline-flex items-center rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-700 backdrop-blur-md">
             {donation.category}
           </span>
@@ -205,6 +252,7 @@ const DonationCard = forwardRef(function DonationCard({
         </div>
       </div>
     </motion.article>
+    </>
   );
 });
 

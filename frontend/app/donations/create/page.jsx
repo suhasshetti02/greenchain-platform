@@ -127,6 +127,7 @@ export default function CreateDonationPage() {
 
   // State for coords from Autocomplete
   const [coords, setCoords] = useState(null);
+  const [buildingName, setBuildingName] = useState(""); // New state for building details
 
   // Sync coords if editing
   useEffect(() => {
@@ -221,6 +222,13 @@ export default function CreateDonationPage() {
     let locationText = formData.get("location");
     if (!locationText && formValues.location) {
         locationText = formValues.location;
+    }
+    
+    // Combine Building Name with Location if provided
+    if (buildingName) {
+        locationText = `${buildingName}, ${locationText}`;
+        formData.set("location", locationText);
+    } else {
         formData.set("location", locationText);
     }
     
@@ -530,6 +538,16 @@ export default function CreateDonationPage() {
                   </div>
                   
                     <div className="relative">
+                      <div className="mb-4">
+                        <FormInput
+                            id="building_name"
+                            name="building_name"
+                            label="Building Name / Flat No"
+                            placeholder="e.g. Galaxy Apts, Flat 402"
+                            value={buildingName}
+                            onChange={(e) => setBuildingName(e.target.value)}
+                        />
+                      </div>
                       <LocationAutocomplete
                         defaultValue={defaults?.location || ""}
                         onInputChange={(val) => {
