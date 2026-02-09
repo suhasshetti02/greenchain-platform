@@ -1,6 +1,11 @@
 const twilio = require("twilio");
 const supabase = require("../utils/supabase");
 const asyncHandler = require("../utils/asyncHandler");
+const NodeGeocoder = require('node-geocoder');
+
+const geocoder = NodeGeocoder({
+  provider: 'openstreetmap'
+});
 
 /* ===============================
    TWILIO CONFIG
@@ -243,13 +248,41 @@ exports.handleIncomingMessage = async (req, res) => {
         // Send processing message first so user knows something is happening
         await sendWhatsAppMessage(From, "🤖 Processing your donation...");
 
-        const extracted = await parseFoodReportAI(message);
+        // 1. Extract Details (AI + Regex Fallback)
+        let extracted = await parseFoodReportAI(message);
+        
+        // Fallback: If AI returned "Not provided", try regex extraction
+        if (!extracted.location || extracted.location === "Not provided") {
+            const locationMatch = message.match(/(?:at|in|near)\s+([a-zA-Z\s,]+)(?=$|[\n.])/i);
+            if (locationMatch && locationMatch[1]) {
+                extracted.location = locationMatch[1].trim();
+                console.log("[WhatsApp] Regex extracted location:", extracted.location);
+            }
+        }
+
         if (!extracted || !extracted.title) {
             await sendWhatsAppMessage(
                 From,
                 "Couldn't understand.\nExample: '5kg cooked rice at Bengaluru'"
             );
             return;
+        }
+
+        // 2. Geocode Location
+        let latitude = null;
+        let longitude = null;
+
+        if (extracted.location && extracted.location !== "Not provided") {
+            try {
+                const geoRes = await geocoder.geocode(extracted.location);
+                if (geoRes && geoRes.length > 0) {
+                    latitude = geoRes[0].latitude;
+                    longitude = geoRes[0].longitude;
+                    console.log(`[WhatsApp] Geocoded '${extracted.location}' -> ${latitude}, ${longitude}`);
+                }
+            } catch (geoErr) {
+                console.error("[WhatsApp] Geocoding error:", geoErr);
+            }
         }
 
         const { error } = await supabase.from("donations").insert({
@@ -265,6 +298,8 @@ exports.handleIncomingMessage = async (req, res) => {
             ).toISOString(),
             status: "available",
             location: extracted.location || "Not provided",
+            latitude,
+            longitude,
             priority_score: 50,
             risk_score: 0.1,
             notes: `Reported via WhatsApp: "${message}"`,
