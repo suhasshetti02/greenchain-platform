@@ -64,16 +64,32 @@ Return ONLY valid JSON:
             }
         );
 
+        if (!response.ok) {
+            console.error("Gemini API Error:", response.status, response.statusText);
+            return { title: text, food_type: "other", quantity_lbs: 5, storage: "room_temp" }; // Fallback
+        }
+
         const data = await response.json();
         const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!raw) return null;
+        
+        if (!raw) return { title: text, food_type: "other", quantity_lbs: 5, storage: "room_temp" }; // Fallback
 
-        return JSON.parse(
-            raw.replace(/```json/g, "").replace(/```/g, "").trim()
-        );
+        // Robust JSON extraction
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : raw;
+
+        return JSON.parse(jsonString);
     } catch (err) {
-        console.error("Gemini error:", err);
-        return null;
+        console.error("Gemini parsing error:", err);
+        // Fallback: Create a basic entry using the message as the title
+        return {
+            title: text.substring(0, 100), // Truncate if too long
+            food_type: "other",
+            quantity_lbs: 5,
+            storage: "room_temp",
+            expiry_hours: 24,
+            location: "Not provided"
+        };
     }
 }
 
