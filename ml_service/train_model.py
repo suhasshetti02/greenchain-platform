@@ -6,31 +6,50 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 import joblib
 import json
 
+# 1. Generate Synthetic Dataset
 def generate_data(n_samples=1000):
     np.random.seed(42)
     
+    # Features
+    # Food Type: 0=Packaged, 1=Produce, 2=Cooked, 3=Dairy/Meat
     food_types = np.random.choice([0, 1, 2, 3], n_samples)
     
+    # Quantity (lbs): 1 to 100
     quantity = np.random.randint(1, 100, n_samples)
     
+    # Hours since prepared (0 to 72)
     hours_prepared = np.random.randint(0, 72, n_samples)
     
+    # Storage: 0=Ambient, 1=Refrigerated, 2=Frozen
     storage = np.random.choice([0, 1, 2], n_samples)
     
+    # Expiry Hours Remaining (-10 to 120)
     expiry_hours = np.random.randint(-10, 120, n_samples)
-   
+    
+    # Generate Label (Spoiled = 1, Safe = 0)
+    # Logic: High risk if:
+    # - Cooked (2) or Dairy (3) AND Ambient (0)
+    # - Expiry < 0
+    # - Prepared > 48 hours ago
+    
     risk_score = np.zeros(n_samples)
     
+    # Base risk from expiry
     risk_score += (expiry_hours < 0) * 0.8
     risk_score += (expiry_hours < 24) * 0.3
     
+    # Risk from Type + Storage
+    # Cooked/Dairy + Ambient = High Risk
     risk_score += ((food_types >= 2) & (storage == 0)) * 0.6
     
+    # Risk from Age
     risk_score += (hours_prepared > 48) * 0.4
     risk_score += (hours_prepared > 24) * 0.2
     
+    # Add noise
     risk_score += np.random.normal(0, 0.1, n_samples)
     
+    # Convert to binary label
     spoiled = (risk_score > 0.5).astype(int)
     
     df = pd.DataFrame({
@@ -44,6 +63,7 @@ def generate_data(n_samples=1000):
     
     return df
 
+# 2. Train Model
 def train():
     print("Generating synthetic data...")
     df = generate_data()
@@ -57,6 +77,7 @@ def train():
     model = LogisticRegression()
     model.fit(X_train, y_train)
     
+    # 3. Evaluate
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
     precision = precision_score(y_test, y_pred)
@@ -73,6 +94,7 @@ def train():
         "recall": recall
     }
     
+    # 4. Save Model & Metrics
     joblib.dump(model, "spoilage_model.pkl")
     with open("model_metrics.json", "w") as f:
         json.dump(metrics, f)
