@@ -514,72 +514,75 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
   const { data, error } = await query;
   if (error) throw error;
 
-  let results = data;
-
-  // Logic: Use Query Param Lat/Lng OR User's Stored Lat/Lng
+  // Determine User Coordinates & City
   let userLat = lat ? parseFloat(lat) : null;
   let userLng = lng ? parseFloat(lng) : null;
+  let userCity = null;
 
-  // If not in query, check if receiver has stored location
-  if (!userLat && !userLng && req.user && req.user.role === 'receiver') {
+  // If receiver is logged in, fetch their stored location & address
+  if (req.user && req.user.role === 'receiver') {
     const { data: userData } = await supabase
       .from('users')
-      .select('latitude, longitude')
+      .select('latitude, longitude, address')
       .eq('id', req.user.id)
       .single();
 
-    if (userData && userData.latitude && userData.longitude) {
-      userLat = userData.latitude;
-      userLng = userData.longitude;
+    if (userData) {
+      // Use stored latency if not provided in query
+      if (!userLat && !userLng && userData.latitude && userData.longitude) {
+        userLat = userData.latitude;
+        userLng = userData.longitude;
+      }
+      
+      // Extract City from Address for text matching
+      // Assumes format: "Street, City, State" or just "City"
+      if (userData.address) {
+        const parts = userData.address.split(',');
+        // Heuristic: If commas exist, take the second part (City), else allow full string
+        userCity = parts.length > 1 ? parts[1].trim() : userData.address.trim();
+        // Fallback: if city string is too short, ignore it
+        if (userCity.length < 3) userCity = null;
+      }
     }
   }
 
-  // If user location is provided (or found), calculate distance and sort
+  // Calculate Distances & Filter
   if (userLat && userLng) {
-
     results = data.map(d => {
-      // If donation has no coords, distance is Infinity (push to bottom)
-      if (!d.latitude || !d.longitude) {
-         return { ...d, distance_km: 9999 };
+      // CASE 1: Donation has coordinates -> Geometric Distance
+      if (d.latitude && d.longitude) {
+        const dist = haversineDistance(userLat, userLng, d.latitude, d.longitude);
+        return {
+          ...d,
+          distance_km: dist
+        };
       }
       
-      const dist = haversineDistance(userLat, userLng, d.latitude, d.longitude);
-      return {
-        ...d,
-        distance_km: dist
-      };
+      // CASE 2: Donation has NO coordinates (Text-Only / WhatsApp) -> Text Match
+      // If the donation text location contains the user's city, treat it as "Local" (e.g. 5km)
+      if (userCity && d.location && d.location.toLowerCase().includes(userCity.toLowerCase())) {
+         return { ...d, distance_km: 5 }; // Assign minimal distance to show it
+      }
+
+      // Default: If no coords and no text match, assume it's FAR/Relevant
+      return { ...d, distance_km: 9999 };
     });
 
-    // FILTER: Only show donations within 30km (City Level)
-    // EXCEPTION: Keep donations with unknown location (distance_km === 9999) so they remain visible.
-    results = results.filter(d => d.distance_km <= 30 || d.distance_km === 9999);
+    // FILTER: Only show donations within 30km
+    // This removes distant geometric matches AND non-matching text locations (9999km)
+    results = results.filter(d => d.distance_km <= 30);
 
     results.sort((a, b) => {
       // Primary sort: Distance (Ascending)
       return a.distance_km - b.distance_km;
     });
-  } else if (req.user && req.user.role === 'receiver') {
-    // Fallback: simple text match if user has address but no coords
-    const { data: userData } = await supabase
-      .from('users')
-      .select('address')
-      .eq('id', req.user.id)
-      .single();
 
-    if (userData && userData.address) {
-      // Naive City Extraction: Assumes format "Street, City, ..." or just "City"
-      // Use comma separator if present, otherwise use whole string
-      const parts = userData.address.split(',');
-      const userCity = parts.length > 1 ? parts[1].trim() : userData.address.trim();
-
-      if (userCity.length > 2) { // Only filter if we have a reasonable city name
-        results = results.filter(d => {
-          if (!d.location) return true; // Keep if unknown, to be safe
-          // Check if donation location strictly contains the user's city
-          return d.location.toLowerCase().includes(userCity.toLowerCase());
-        });
-      }
-    }
+  } else if (userCity) {
+    // Fallback: No coordinates available at all, strict text matching
+    results = results.filter(d => {
+      if (!d.location) return false; // Hide unknown if we can't verify
+      return d.location.toLowerCase().includes(userCity.toLowerCase());
+    });
   }
 
   res.json({ donations: results });
