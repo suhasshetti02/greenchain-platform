@@ -576,6 +576,8 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
 
   // Calculate Distances & Filter
   if (userLat && userLng) {
+    console.log(`[Debug] User Loc: ${userLat}, ${userLng}. Address: "${userAddress}"`);
+    
     results = data.map(d => {
       // CASE 1: Donation has coordinates -> Geometric Distance
       if (d.latitude && d.longitude) {
@@ -584,8 +586,16 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
       }
       
       // CASE 2: Donation has NO coordinates (Text-Only) -> Strict Token Match
-      if (userAddress && d.location && hasTokenMatch(userAddress, d.location)) {
-         return { ...d, distance_km: 5 }; // Treat as "Nearby"
+      if (userAddress && d.location) {
+          const match = hasTokenMatch(userAddress, d.location);
+          if (match) {
+             console.log(`[Debug] Match Found! Donation: "${d.title}" Loc: "${d.location}" matched User Addr.`);
+             return { ...d, distance_km: 5 }; // Treat as "Nearby"
+          } else {
+             console.log(`[Debug] NO Match. Donation: "${d.title}" Loc: "${d.location}" vs User Addr: "${userAddress}"`);
+          }
+      } else {
+         console.log(`[Debug] No Addr check possible. UserAddr: ${!!userAddress}, DonLoc: ${!!d.location}`);
       }
 
       // Default: irrelevant / far
@@ -602,12 +612,16 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
     });
 
   } else if (userAddress) {
+    console.log(`[Debug] User has NO Coords, checking Address: "${userAddress}"`);
     // Fallback: No coordinates, filtering purely by address token match
     results = results.filter(d => {
       if (!d.location) return false; 
-      return hasTokenMatch(userAddress, d.location);
+      const match = hasTokenMatch(userAddress, d.location);
+      if (!match) console.log(`[Debug] NO Match (Addr Only). Donation: "${d.location}" vs "${userAddress}"`);
+      return match;
     });
   } else {
+    console.log(`[Debug] User has NO Coords AND NO Address. Showing all?`);
     // Fallback: No user address/coords at all? 
     // Show everything (or nothing?). Currently showing all available sorted by priority as per pre-existing logic if !lat/lng
     // If we want strict privacy, we could return empty, but let's keep it open for guests until specified otherwise.
