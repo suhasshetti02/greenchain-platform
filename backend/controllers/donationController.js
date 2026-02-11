@@ -735,7 +735,10 @@ exports.confirmPickup = asyncHandler(async (req, res) => {
     newClaimStatus = 'cancelled'; // Mapping no-show/rejection to cancelled
   }
 
-  let newDonationStatus = confirmed ? 'completed' : 'available';
+  // FIX: Web UI "Confirm" on pending claim = "Approve Request".
+  // Donation should go to 'in_transit' (Reserved for this receiver), NOT 'completed'.
+  // Completion happens when Receiver marks "Delivered".
+  let newDonationStatus = confirmed ? 'in_transit' : 'available';
 
   /* DEBUG LOGGING UPDATE REMOVED */
 
