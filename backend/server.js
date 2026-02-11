@@ -56,4 +56,9 @@ app.listen(PORT, () => {
   console.log(`✓ GreenChain backend running on port ${PORT}`);
   console.log(`  API: http://localhost:${PORT}/api`);
   console.log(`  Health check: http://localhost:${PORT}/api/health`);
+  
+  // Debug Environment Variables
+  const geminiKey = process.env.GEMINI_API_KEY;
+  console.log(`[Env] GEMINI_API_KEY: ${geminiKey ? "Set (User Configured)" : "MISSING"}`);
+  console.log(`[Env] SUPABASE_URL: ${process.env.SUPABASE_URL ? "Set" : "MISSING"}`);
 });
