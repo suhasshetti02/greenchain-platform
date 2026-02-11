@@ -249,13 +249,14 @@ exports.createDonation = asyncHandler(async (req, res) => {
   if (error) throw error;
 
   // --- NOTIFY NEARBY NGOS ---
-  if (latitude && longitude) {
+  if ((latitude && longitude) || location) {
     // Fire and forget notification
     notifyNearbyReceivers({
       title,
       quantity_lbs,
-      lat: parseFloat(latitude),
-      lng: parseFloat(longitude)
+      lat: latitude ? parseFloat(latitude) : null,
+      lng: longitude ? parseFloat(longitude) : null,
+      locationStr: location
     }).catch(err => console.error("Notification Error:", err));
   }
 
@@ -271,24 +272,42 @@ exports.createDonation = asyncHandler(async (req, res) => {
 /* =========================
    HELPER: Notify Nearby Receivers
 ========================= */
-async function notifyNearbyReceivers({ title, quantity_lbs, lat, lng }) {
-  console.log(`[Notification] Finding receivers near ${lat}, ${lng}...`);
+async function notifyNearbyReceivers({ title, quantity_lbs, lat, lng, locationStr }) {
+  console.log(`[Notification] Finding receivers near [${lat}, ${lng}] OR matching "${locationStr}"...`);
 
-  // Fetch all receivers (NGOs) with valid location
-  // Note: For large scale, use PostGIS `ST_DWithin`
+  // Fetch all receivers (NGOs) with valid location OR address
   const { data: receivers } = await supabase
     .from("users")
-    .select("id, name, phone, latitude, longitude")
-    .eq("role", "receiver")
-    .not("latitude", "is", null)
-    .not("longitude", "is", null);
+    .select("id, name, phone, latitude, longitude, address")
+    .eq("role", "receiver");
 
   if (!receivers || receivers.length === 0) return;
 
   const NEARBY_RADIUS_KM = 15;
+  
+  // Helper for Token Match (duplicated from list logic for independence)
+  const extractTokens = (str) => {
+    if (!str) return [];
+    return str.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3);
+  };
+  const hasTokenMatch = (userAddr, donationLoc) => {
+    const userTokens = extractTokens(userAddr);
+    const donationTokens = extractTokens(donationLoc);
+    return userTokens.some(t => donationTokens.includes(t));
+  };
+
   const nearby = receivers.filter(user => {
-    const dist = haversineDistance(lat, lng, user.latitude, user.longitude);
-    return dist <= NEARBY_RADIUS_KM;
+    // 1. Geometric Match
+    if (lat && lng && user.latitude && user.longitude) {
+        const dist = haversineDistance(lat, lng, user.latitude, user.longitude);
+        if (dist <= NEARBY_RADIUS_KM) return true;
+    }
+    // 2. Text Match (if coords missing OR geometric failed but text might match? usually one or other)
+    // Actually, if we have coords, we trust them. Only fallback to text if coords missing.
+    if ((!lat || !lng) && locationStr && user.address) {
+        if (hasTokenMatch(user.address, locationStr)) return true;
+    }
+    return false;
   });
 
   console.log(`[Notification] Found ${nearby.length} nearby NGOs out of ${receivers.length}.`);
@@ -514,72 +533,84 @@ exports.listAvailableDonations = asyncHandler(async (req, res) => {
   const { data, error } = await query;
   if (error) throw error;
 
-  let results = data;
+  /* ============================================================
+     TOKEN MATCHING HELPER
+     Extracts "significant" words (len > 3) to match cities/areas
+  ============================================================ */
+  const extractTokens = (str) => {
+    if (!str) return [];
+    return str.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // remove special chars
+      .split(/\s+/)
+      .filter(w => w.length > 3); // only keep "big" words (e.g. "bangalore", "whitefield")
+  };
 
-  // Logic: Use Query Param Lat/Lng OR User's Stored Lat/Lng
+  const hasTokenMatch = (userAddr, donationLoc) => {
+    const userTokens = extractTokens(userAddr);
+    const donationTokens = extractTokens(donationLoc);
+    // Return true if ANY significant token overlaps
+    return userTokens.some(t => donationTokens.includes(t));
+  };
+
+  // Determine User Coordinates & Address
   let userLat = lat ? parseFloat(lat) : null;
   let userLng = lng ? parseFloat(lng) : null;
+  let userAddress = null;
 
-  // If not in query, check if receiver has stored location
-  if (!userLat && !userLng && req.user && req.user.role === 'receiver') {
+  // If receiver is logged in, fetch their stored location & address
+  if (req.user && req.user.role === 'receiver') {
     const { data: userData } = await supabase
       .from('users')
-      .select('latitude, longitude')
+      .select('latitude, longitude, address')
       .eq('id', req.user.id)
       .single();
 
-    if (userData && userData.latitude && userData.longitude) {
-      userLat = userData.latitude;
-      userLng = userData.longitude;
+    if (userData) {
+      if (!userLat && !userLng && userData.latitude && userData.longitude) {
+        userLat = userData.latitude;
+        userLng = userData.longitude;
+      }
+      userAddress = userData.address;
     }
   }
 
-  // If user location is provided (or found), calculate distance and sort
+  // Calculate Distances & Filter
   if (userLat && userLng) {
-
     results = data.map(d => {
-      // If donation has no coords, distance is Infinity (push to bottom)
-      if (!d.latitude || !d.longitude) {
-         return { ...d, distance_km: 9999 };
+      // CASE 1: Donation has coordinates -> Geometric Distance
+      if (d.latitude && d.longitude) {
+        const dist = haversineDistance(userLat, userLng, d.latitude, d.longitude);
+        return { ...d, distance_km: dist };
       }
       
-      const dist = haversineDistance(userLat, userLng, d.latitude, d.longitude);
-      return {
-        ...d,
-        distance_km: dist
-      };
+      // CASE 2: Donation has NO coordinates (Text-Only) -> Strict Token Match
+      if (userAddress && d.location && hasTokenMatch(userAddress, d.location)) {
+         return { ...d, distance_km: 5 }; // Treat as "Nearby"
+      }
+
+      // Default: irrelevant / far
+      return { ...d, distance_km: 9999 };
     });
 
-    // FILTER: Only show donations within 30km (City Level)
-    // EXCEPTION: Keep donations with unknown location (distance_km === 9999) so they remain visible.
-    results = results.filter(d => d.distance_km <= 30 || d.distance_km === 9999);
+    // FILTER: Only show donations within 30km
+    // This removes distant geometric matches AND non-matching text locations (9999km)
+    results = results.filter(d => d.distance_km <= 30);
 
     results.sort((a, b) => {
       // Primary sort: Distance (Ascending)
       return a.distance_km - b.distance_km;
     });
-  } else if (req.user && req.user.role === 'receiver') {
-    // Fallback: simple text match if user has address but no coords
-    const { data: userData } = await supabase
-      .from('users')
-      .select('address')
-      .eq('id', req.user.id)
-      .single();
 
-    if (userData && userData.address) {
-      // Naive City Extraction: Assumes format "Street, City, ..." or just "City"
-      // Use comma separator if present, otherwise use whole string
-      const parts = userData.address.split(',');
-      const userCity = parts.length > 1 ? parts[1].trim() : userData.address.trim();
-
-      if (userCity.length > 2) { // Only filter if we have a reasonable city name
-        results = results.filter(d => {
-          if (!d.location) return true; // Keep if unknown, to be safe
-          // Check if donation location strictly contains the user's city
-          return d.location.toLowerCase().includes(userCity.toLowerCase());
-        });
-      }
-    }
+  } else if (userAddress) {
+    // Fallback: No coordinates, filtering purely by address token match
+    results = results.filter(d => {
+      if (!d.location) return false; 
+      return hasTokenMatch(userAddress, d.location);
+    });
+  } else {
+    // Fallback: No user address/coords at all? 
+    // Show everything (or nothing?). Currently showing all available sorted by priority as per pre-existing logic if !lat/lng
+    // If we want strict privacy, we could return empty, but let's keep it open for guests until specified otherwise.
   }
 
   res.json({ donations: results });

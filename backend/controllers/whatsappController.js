@@ -100,7 +100,7 @@ Return ONLY valid JSON with this structure:
             console.error(`[Gemini] API Error ${response.status}: ${errText}`);
             // Fallback: Create a basic entry
             return { 
-                title: text.substring(0, 50), 
+                title: text.substring(0, 200), 
                 food_type: "other", 
                 quantity_lbs: 5, 
                 storage: "room_temp",
@@ -115,7 +115,7 @@ Return ONLY valid JSON with this structure:
 
         if (!raw) {
              console.warn("[Gemini] Empty response from AI");
-             return { title: text.substring(0, 50), food_type: "other", quantity_lbs: 5, storage: "room_temp", location: "Not provided" };
+             return { title: text.substring(0, 200), food_type: "other", quantity_lbs: 5, storage: "room_temp", location: "Not provided" };
         }
 
         // Robust JSON extraction
@@ -126,7 +126,7 @@ Return ONLY valid JSON with this structure:
     } catch (err) {
         console.error("[Gemini] Parsing error:", err.message);
         return {
-            title: text.substring(0, 50),
+            title: text.substring(0, 200),
             food_type: "other",
             quantity_lbs: 5,
             storage: "room_temp",
