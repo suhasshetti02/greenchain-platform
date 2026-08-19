@@ -215,7 +215,11 @@ exports.createDonation = asyncHandler(async (req, res) => {
 
   // Get Scores from AI (or Fallback)
   const legacyPayload = { food_type, quantity_lbs, storage, hours_since_prepared };
-  const { risk_score, priority_score, priority } = await calculatePriorityAI(aiPayload, legacyPayload);
+  let { risk_score, priority_score, priority } = await calculatePriorityAI(aiPayload, legacyPayload);
+
+  // SANITY CHECK: Clamp values
+  risk_score = Math.max(0, Math.min(1, parseFloat(risk_score) || 0));
+  priority_score = Math.max(0, Math.min(100, parseFloat(priority_score) || 0));
 
   const imageUrl = await uploadDonationImage(req.user.id, req.file);
 

@@ -220,36 +220,37 @@ export default function DonationDetailPage({ params }) {
         {/* AI Analysis Section */}
         <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm ring-1 ring-emerald-900/5">
           <div className="flex items-start gap-4">
-            <div className="rounded-xl bg-emerald-100 p-3 text-emerald-600">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
-            </div>
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">AI Spoilage Prediction</p>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    {donation.risk_score != null
-                      ? `Risk Score: ${Math.min(100, Math.round(donation.risk_score * 100))}%`
-                      : "Analysis Pending"}
-                  </h2>
+                <div className="rounded-xl bg-emerald-100 p-3 text-emerald-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
                 </div>
-                {donation.risk_score != null && (
-                  <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${donation.risk_score > 0.8 ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                      donation.risk_score > 0.5 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                        'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                    Priority: {donation.priority_score > 75 ? "CRITICAL" : donation.priority_score > 50 ? "HIGH" : "NORMAL"}
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                Our AI model analyzes food type, storage conditions ({donation.storage || "standard"}), and preparation time to estimate spoilage risk.
-                {donation.risk_score > 0.5
-                  ? " This item has a higher likelihood of spoilage. Recommended for immediate pickup."
-                  : " This item is predicted to remain fresh for the standard duration."}
-              </p>
+                <div className="flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">AI Spoilage Prediction</p>
+                            <h2 className="text-lg font-bold text-slate-900">
+                                {donation.risk_score != null 
+                                    ? `Risk Score: ${Math.min(100, Math.round(donation.risk_score * 100))}%`
+                                    : "Analysis Pending"}
+                            </h2>
+                        </div>
+                        {donation.risk_score != null && (
+                            <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${
+                                donation.risk_score > 0.8 ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                donation.risk_score > 0.5 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}>
+                                Priority: {donation.priority_score > 75 ? "CRITICAL" : donation.priority_score > 50 ? "HIGH" : "NORMAL"}
+                            </div>
+                        )}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                        Our AI model analyzes food type, storage conditions ({donation.storage || "standard"}), and preparation time to estimate spoilage risk. 
+                        {donation.risk_score > 0.5 
+                            ? " This item has a high probability of spoiling soon. Immediate pickup is recommended to ensure freshness."
+                            : " This item is predicted to remain fresh for the standard duration."}
+                    </p>
+                </div>
             </div>
-          </div>
         </div>
 
         {/* Info Grid */}

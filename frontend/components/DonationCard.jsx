@@ -50,7 +50,11 @@ const DonationCard = forwardRef(function DonationCard({
   }, [userLocation, donation]);
 
   // AI Risk Logic
-  const riskScore = (donation.risk_score !== null && donation.risk_score !== undefined) ? Math.round(donation.risk_score * 100) : null;
+  // Ensure risk_score is between 0-1, then convert to percentage (0-100)
+  // Cap at 100 to prevent display bugs if backend sends incorrect values
+  const riskScore = (donation.risk_score !== null && donation.risk_score !== undefined) 
+    ? Math.min(100, Math.round(donation.risk_score * 100)) 
+    : null;
   let riskColor = "bg-slate-100 text-slate-700";
   let riskLabel = "Unknown";
   let riskBorder = "border-slate-200";
