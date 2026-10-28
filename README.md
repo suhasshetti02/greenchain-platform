@@ -36,11 +36,7 @@ The platform operates using a microservices-oriented approach:
 
 For a more detailed breakdown, please see `frontend/ARCHITECTURE.md`.
 
-## Screenshots
-*(Add screenshots here)*
 
-## Demo
-*(Add demo link here)*
 
 ## Installation
 
