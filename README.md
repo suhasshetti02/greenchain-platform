@@ -128,3 +128,24 @@ Currently, manual testing is required. Unit and integration tests are planned fo
 ## License
 
 This project is licensed under the MIT License.
+
+---
+
+<!-- SCREENSHOT-GALLERY:START -->
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/01-screenshot-2026-08-19-224526.png" width="49%" alt="01 screenshot 2026 08 19 224526"/>
+  <img src="screenshots/02-screenshot-2026-08-19-224850.png" width="49%" alt="02 screenshot 2026 08 19 224850"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/03-screenshot-2026-08-19-225307.png" width="49%" alt="03 screenshot 2026 08 19 225307"/>
+  <img src="screenshots/04-screenshot-2026-08-19-225412.png" width="49%" alt="04 screenshot 2026 08 19 225412"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/05-screenshot-2026-08-19-225444.png" width="49%" alt="05 screenshot 2026 08 19 225444"/>
+</p>
+
+<!-- SCREENSHOT-GALLERY:END -->
