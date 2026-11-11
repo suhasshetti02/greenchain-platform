@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="https://raw.githubusercontent.com/suhasshetti02/suhasshetti02/main/assets/projects/greenchain.svg" width="100%" alt="greenchain project banner"/>
+</div>
+
+---
+
 # GreenChain Platform
 
 A full-stack application designed to bring transparency and trust to charitable food donations, minimizing waste and predicting food spoilage via AI.
