@@ -1,124 +1,105 @@
-# GreenChain Platform
+# GreenChain — Food Redistribution Platform
 
-A full-stack application designed to bring transparency and trust to charitable food donations, minimizing waste and predicting food spoilage via AI.
+GreenChain is a full-stack food redistribution application that connects donors and receivers/NGOs through donation listing, claiming, pickup, and verification workflows. The current codebase combines a Next.js client, Express API, Supabase PostgreSQL storage, and a separate FastAPI prediction service.
 
-## Problem
+> **Project status:** Full-stack prototype. The repository includes real application routes and database integration, but some integrations and verification behavior remain partial or simulated. It should not be described as a fully deployed blockchain system.
 
-Food waste from events and restaurants often goes unutilized because charities lack real-time visibility into available food and its safety (spoilage risk).
+## Features in the codebase
 
-## Solution
+- JWT-based registration and login with role-aware API routes.
+- Donation creation, browsing, and claim workflows backed by Supabase.
+- Image upload through Supabase Storage.
+- Location-aware donation logic using latitude / longitude and distance utilities.
+- Priority scoring that attempts to call a local FastAPI prediction endpoint and falls back to rule-based scoring if that service is unavailable.
+- Gemini-based food-spoilage guidance with a rule-based fallback.
+- WhatsApp / Twilio messaging integration and webhook routes.
+- Admin, user, claim, donation, verification, and AI route modules.
+- A Next.js frontend and a separate Python FastAPI ML service.
 
-GreenChain creates a transparent ecosystem for donations, ensuring that contributions reach their intended recipients. It leverages AI to provide real-time spoilage estimates based on storage conditions and food types, keeping donated food safe. It also features an architecture designed to support future blockchain-based verification.
+## Stack
 
-## Features
-
-*   **User Authentication:** Secure JWT-based registration and login for donors, NGOs, and receivers.
-*   **Donation Marketplace:** Donors can easily list items, and receivers can browse and claim available donations.
-*   **AI Spoilage Prediction:** 
-    *   Generative AI (Gemini) integration for real-time food safety advice.
-    *   Predictive ML microservice for calculating numerical risk scores.
-*   **Verification Flow:** A multi-step verification process (currently simulated for MVP) ensures claims are legitimate.
-*   **Role-based Dashboards:** Tailored dashboard views for Donors, NGOs, and Receivers.
-
-## Tech Stack
-
-*   **Frontend:** Next.js 14, React 18, Tailwind CSS ^4.0
-*   **Backend:** Node.js, Express.js
-*   **Database & Auth:** Supabase (PostgreSQL), JWT
-*   **AI/ML:** Gemini 2.0 Flash API (REST), Python (FastAPI), scikit-learn
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js 14, React 18, Tailwind CSS |
+| Backend API | Node.js, Express |
+| Database / storage | Supabase PostgreSQL, Supabase Storage |
+| Authentication | JWT, bcryptjs |
+| ML service | Python, FastAPI, scikit-learn, pandas, NumPy, joblib |
+| Generative AI | Gemini API |
+| Messaging | Twilio |
+| Deployment configuration | AWS / Amplify configuration and service-specific deployment files |
 
 ## Architecture
 
-The platform operates using a microservices-oriented approach:
-1. **Frontend**: Next.js app running on port 3000.
-2. **Backend**: Express API running on port 3001, handling business logic and talking to Supabase.
-3. **ML Service**: Python FastAPI server (optional local run) serving the predictive scikit-learn model.
-
-For a more detailed breakdown, please see `frontend/ARCHITECTURE.md`.
-
-
-
-## Installation
-
-### Prerequisites
-*   Node.js and npm
-*   Python 3.x (for ML Service)
-*   A Supabase account
-
-## Environment Variables
-
-**Backend (`backend/.env`)**
-```env
-SUPABASE_URL=YOUR_SUPABASE_URL
-SUPABASE_KEY=YOUR_SUPABASE_ANON_KEY
-GEMINI_API_KEY=YOUR_GEMINI_KEY
-FRONTEND_URL=http://localhost:3000
+```text
+Next.js frontend
+    │
+    ▼
+Express API (default port 3001)
+    ├── Supabase PostgreSQL / Storage
+    ├── Gemini food-safety guidance
+    ├── Twilio WhatsApp integration
+    └── FastAPI ML service (default local URL used by controller: localhost:8000)
+            └── spoilage-risk prediction
 ```
 
-**Frontend (`frontend/.env.local`)**
-```env
-NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-NEXT_PUBLIC_API_URL=http://localhost:3001
+The FastAPI prediction service is called by the donation controller using a local URL. For a multi-container or cloud deployment, configure service discovery / the ML service URL rather than assuming `localhost` refers to the other service.
+
+## Repository structure
+
+- `frontend/` — Next.js app.
+- `backend/server.js` — Express application entry point.
+- `backend/routes/` — API route modules.
+- `backend/controllers/` — auth, donation, claim, AI, verification, user, and WhatsApp logic.
+- `backend/utils/` — Supabase client, location, and async helpers.
+- `backend/*.sql`, `backend/migrations/` — SQL migrations and schema updates.
+- `ml_service/` — FastAPI prediction endpoint and model files.
+- `amplify.yml` — frontend build configuration.
+
+## Run locally
+
+Configure the required environment variables first. The names documented in the service code include:
+
+- Backend: `SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY`, `FRONTEND_URL`, plus JWT and Twilio settings used by the corresponding modules.
+- Frontend: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`.
+- ML service: use the model artifact and dependency files included under `ml_service/`.
+
+Backend:
+
+```bash
+cd backend
+npm install
+npm run dev
 ```
 
-## Running Locally
+Frontend:
 
-1. **Backend**:
-   ```bash
-   cd backend
-   npm install
-   npm run dev
-   ```
-2. **Frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-3. **ML Service**:
-   ```bash
-   cd ml_service
-   pip install -r requirements.txt
-   uvicorn app:app --reload
-   ```
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Testing
+ML service:
 
-Currently, manual testing is required. Unit and integration tests are planned for future releases.
+```bash
+cd ml_service
+pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
+```
 
-## Project Structure
+Check service-specific configuration and SQL migration instructions before connecting to an existing Supabase project. The repository's backend starts the API on port 3001 by default.
 
-*   `./backend`: The Node.js/Express API (auth, logic, Supabase integration).
-*   `./frontend`: The Next.js client-side application.
-*   `./ml_service`: Python FastAPI app serving the scikit-learn spoilage model.
+## Limitations and security considerations
 
-## API Information
-
-*   `POST /api/auth/register` & `/api/auth/login` - User Authentication
-*   `GET /api/donations` & `POST /api/donations` - Manage donations
-*   `POST /api/donations/:id/claim` - Claim a donation
-*   `POST /api/ai/spoilage-suggestion` - Get AI spoilage estimate
-*   `POST /api/verify/:eventId/verify` - Verify an event (generates mock tx_hash)
-
-## Database Information
-
-*   Hosted on Supabase (PostgreSQL).
-*   Tables include `users`, `donations`, `claims`, and `verification_events`.
-*   Secured via Row Level Security (RLS) policies.
-
-## Limitations
-
-*   **Simulated Blockchain**: The verification transaction hashes are currently mocked. No actual smart contracts are deployed.
-*   **Security**: JWTs are stored in `localStorage` in the frontend (vulnerable to XSS).
-*   **ML Integration**: The Python ML service is available locally but not yet fully integrated into the Node.js production data flow.
-
-## Future Improvements
-
-*   Implement `httpOnly` cookies for secure JWT storage.
-*   Connect the verification flow to an actual blockchain network (e.g., Polygon).
-*   Add automated testing (Jest, Cypress).
+- The donation controller calls the ML service at a hard-coded local URL and falls back to legacy heuristic priority scoring on failure.
+- The ML service output is a model-derived risk / priority estimate, not a certified food-safety determination.
+- Gemini spoilage suggestions are general advisory estimates and must not replace food-safety procedures or human inspection.
+- The verification workflow currently generates mock transaction hashes; this is not evidence of on-chain verification or a deployed smart contract.
+- The frontend stores JWTs in browser-accessible storage in the current implementation; this carries XSS exposure risk. Prefer secure, HttpOnly cookie handling and a suitable CSRF strategy.
+- Verify Supabase Row Level Security policies, server-side role checks, upload permissions, and Twilio webhook authentication before production use.
+- README / interview-guide claims should be checked against the current route implementations and deployment environment before describing the platform as production-ready.
 
 ## License
 
-This project is licensed under the MIT License.
+See repository license and third-party service/model terms.
